@@ -1,0 +1,105 @@
+AT TURAIF TOURISM SIMULATION
+===
+A 'True-to-Life' Agent-Based Spatial-Temporal Simulation to model Tourism in the Diriyah At-Turaif district. The simulation models activity, behaviours and preferences using: 
+
+- Agent-Based-Models for behaviours and preferences for Visiting agents.
+- Geographic Information System (GIS) to construct a environment from a 'real world' geography of At-Turaif, with corresponding tourist destinations and amenities.
+
+CANON
+===
+- Agents are instantiated as Visitors. A singleton agent is a Visitor.
+- Visitors are assigned a visitor_type at initialisation in accordance with the defined Visitor Types and thier respective probability distributions, given by relative wieghts.
+- Visitors are assigned a length_of_stay in hours, at initialisation sampled from an hourly range, given by lengh_of_stay.
+- Visitors are assigned a walk_speed which is defined categorically by thier Visitor Type and assigned a traversal speed in simulation.
+- time_of_day: Lunch and Dinner times are defined as ranges over a given day. A Visitor will choose to attend Lunch or Dinner when they are not engaged in activities in these periods and thier length of stay has not exceed time in simulation.
+- Visitors make decisions in accordance with the Visitor Decision Model, defined in AGENTS.
+- A simulation runs over a period of 24 hours days given by simulation_days, where a total number of expected visitors to arrive over the simulation_days will be the total_expected_number_of_visitors.
+- Each time-step given by time_step inisitalised at 15-minutes.
+- The simulation models visitor arrivals between the operational_window=(0900, 2100) over any given day, using a Poisson distribution with rate λ. Where λ is the total expected number of visitors divided by the number of minutes in the operational window over the 5-day period.
+- The number of visitors that arrive within the operational_window for any given day, varies by the daily_arrival_variation.
+- Visitors have an attribute stay_over which is initially False. If a visitor has not exceeded their length_of_stay by 2300 on any given day, stay_over is set to True, indicating they will return the following day.
+
+PARAMETERS
+===
+A simulation is initialised with various parameters that define a unique Tourist Planning Scenario. These parameters may be supplied as a .csv, where others are defined at variables within the simulation. 
+
+- time_step: initialised at 15 minutes of real-time.
+- operational_window: initialised (0900, 2100)
+- simulation_days: number of simulation days initialised at 5.
+- total_expected_number_of_visitors: the total expected number of visitors over the 5-day simulation period, initialised at 500.
+- average_daily_expected_visitors: Calculated as total_expected_number_of_visitors / simulation_days. This represents the average number of visitors expected each day without variation.
+- daily_arrival_variation: a percentage fluctuation (±%) applied to the average daily expected number of visitors to introduce variability. Initiallised at 0.125.
+- number_of_visitors_per_day: adjusted daily as the `average_daily_expected_visitors` ± `daily_arrival_variation`. This ensures that each day has a slightly different number of visitors, reflecting the natural fluctuation of tourist numbers.
+- arrival_rate (λ): For the Poisson distribution is calculated daily as: λ = number_of_visitors_per_day / operational_window_minutes.
+- Visitor Types: the set of possible Visitor Types {{Families with Children, Students, Young Professionals, Seniors}} with Colour codes for Visualisation and categorical Walk Speeds, supplied as a .csv.
+- Visitor Type Distributions: the relative-wieghted distribution over the possible Visitor Types, supplied as a .csv.
+- Visitor Type Preferences: the list of prefered destinations for each Visitor Type. 
+- length_of_stay: sampled between a range over (8, 12) hours.
+- walk_speed: the speed at which Visitors traverse the GIS 'ways' on the map.
+- number_of_visitors: the number of Visitors for any given simulation day arriving in the operational window ()
+- time_of_day: initialised as lunch=(1200, 1400), dinner=(1700,1900).
+- visitation_time at a given destination is modelled using a normal distribution, with the mean=90 minutes and standard deviation=15 minutes. This reflects the tendency for most visitation times to cluster around an average with some variation.
+
+AGENTS
+===
+Agents are assigned Visitor Types, which define the preferences that influence the selection of available destinations over the duration of a visit, in hours.
+
+Visitors decide what activities they will undertake in the simulation. These activities are determined probabilistically in accordance with their Visitor Types and according preference models. 
+
+At each time step, Visitors take actions in accordance with the following decision model, which determines a utility function for each possible destination type. The utility function models the travel duration against the preference.
+
+- Visitors choose destinations as decision-making loop that terminates when their length_of_stay is exceeded i.e. time_in_simulation > length_of_stay.
+- Visitors choose a destination probabilistically in accordance with thier weighted preference utility model, sampled as a Monte-Carlo process and  the distance to the preferred destination, basis thier current location on the GIS map. 
+- Visitors choose a destination based on a utility score calculated as: Utility = PreferenceWeight - (Distance/WalkSpeed). The destination with the highest utility is selected.
+- Each destination's utility for a visitor is calculated with the formula: Utility = PreferenceWeight - (Distance/WalkSpeed).
+- A Monte Carlo sampling approach is used to select a destination from the weighted list of utilities. Despite preferences, there is a non-zero probability for a visitor to choose any available destination, allowing for spontaneous decisions.
+- The weighted random choice is implemented by constructing a cumulative distribution function (CDF) from the utilities, and then selecting a destination by generating a random number between 0 and 1 and finding where it falls on the CDF.
+- Visitors attend a destination for a visitation_time which is randomly sampled from a defined range.
+- Visitors attend Lunch or Dinner by selecting desintations of type amienities: restaurant or cafe in accordance with thier preference model.
+- Utility scores are recalculated at each decision-making step, ensuring dynamic responses to the visitor's current location and remaining time.
+
+The decision making loop is defined graphically by the following decision model:
+./models/visitor_decision_model.png
+
+VISUALISATION
+===
+The simulation is visualised as Vistors moving around a 'true-to-life' GIS map.
+
+The GIS map depicts vector shape outlines for destinations {tourism, leisure, amenity}, 'ways' and 'buildings'. Where:
+- Desinations are circular nodes.
+- Ways are connected paths (lines).
+- Buildings are enclosed shapes.
+
+The GIS map has an OpenStreetMap 'like' map underlay for:
+./environment.geojson
+
+Vistors must be depicted as people icons that move around the GIS map with a colour coding that depicts thier Visitor Type. Where:
+- Visitors walk around the GIS map, traversing GIS 'ways' to get to thier target destinations.
+- Once they arrive at a target destination, they move inside the boundary of the enscoled GIS Buidling.
+- For the duration that they are attending the destination, the visitor must take a random walk within the area enclosed by the GIS Building for the given destiation.
+- Once a Visitor is finished attending a destination, the Visitor must exit the enclosed building and move to thier next location. 
+- When the Visitors length_of_stay is elapsed, the vistor icon must dissapear from the map.
+
+ENVIRONMENT
+===
+The environment is constructed from the following core GIS elements:
+
+- Ways: defines a connected graph that Agents can traverse to arrive a destinations.
+- Buildings: defines the buildings in the local geography that may or may not contain destinations.
+- Destinations: are GIS objects of type: amenity or tourism, with a variety of different fields, such as: park, restaurant, cafe, museum etc.
+
+Other GIS elements may esits and are defined in at_turaif.geojson.
+
+For simplicity, Agents only interact with Ways, Buildings and Destinations. As an example, the list of GIS Destinations is given as follows:
+
+./models/environment.geojson
+./models/interactions.csv
+
+VISITOR TYPES PREFERENCES
+===
+We assume pre-defined preferences for each unique Visitor Type.
+
+Preference Table:
+{preference_table}
+
+In this way, preferred destinations map to individual Visitor Types, indicating the most likely destinations to be selected by any given Visitor of a given Visitor Type.
